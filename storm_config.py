@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 import os
 
+
 @dataclass
 class STORMConfig:
     """Configuration for language models"""
 
-    # overall configs 
+    # overall configs
     fast_model: str = "gpt-4o-mini"
     smart_model: str = "gpt-4o"
     long_context_model: str = "gpt-4o"
@@ -18,11 +19,19 @@ class STORMConfig:
     media_path: str = f"{os.getcwd()}/generated_visuals/"
     max_retry: int = 10
     temperature: float = 1.0
-    quality: str = "-ql"  # manim docs
+    quality: str = "-qh"  # manim docs
+
+    # judge model
+    judge_model: str = "gpt-4o"
+    summary_model: str = "gpt-4o-mini"
 
     # output locations
     docs_path: str = f"{os.getcwd()}/generated_docs/"
 
     # api keys
-    openai_api_key: str = "abc"
-    anthropic_api_key: str = "abc"
+    openai_api_key: str = (
+        ""
+    )
+    anthropic_api_key: str = (
+        ""
+    )

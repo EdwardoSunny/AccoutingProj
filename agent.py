@@ -12,6 +12,8 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.prebuilt import ToolNode
 from typing import Annotated
+from langchain.callbacks import get_openai_callback
+
 
 class VisualTools:
     def __init__(self, storm_config: STORMConfig = STORMConfig()):
@@ -19,9 +21,12 @@ class VisualTools:
         self.storm_config = storm_config
         if storm_config.code_model.split("-")[0].lower() == "gpt":
             self.llm = ChatOpenAI(
-                model=storm_config.code_model, temperature=storm_config.temperature, api_key=storm_config.openai_api_key
+                model=storm_config.code_model,
+                temperature=storm_config.temperature,
+                api_key=storm_config.openai_api_key,
             )
-            self.code_writing_prompt = ChatPromptTemplate.from_messages([
+            self.code_writing_prompt = ChatPromptTemplate.from_messages(
+                [
                     (
                         "system",
                         "You are an expert in the Manim library, specializing in creating animations and visualizations in Python. Your task is to write Manim code based on user-provided topics or queries and you ONLY OUTPUT PYTHON CODE with no explanations. If the user includes a specific example, generate a visualization of that concept directly. If no example is given, create a relevant example that effectively represents the topic. Provide only the Python code as output, formatted to be saved and executed as a .py file.",
@@ -31,10 +36,13 @@ class VisualTools:
             )
         elif storm_config.code_model.split("-")[0].lower() == "claude":
             self.llm = ChatAnthropic(
-                model=storm_config.code_model, temperature=storm_config.temperature, api_key=storm_config.anthropic_api_key
+                model=storm_config.code_model,
+                temperature=storm_config.temperature,
+                api_key=storm_config.anthropic_api_key,
             )
             # Prompt templates for generating and fixing Manim code
-            self.code_writing_prompt = ChatPromptTemplate.from_messages([
+            self.code_writing_prompt = ChatPromptTemplate.from_messages(
+                [
                     (
                         "system",
                         "You are an expert in the Manim library, specializing in creating animations and visualizations in Python. Your task is to write Manim code based on user-provided topics or queries and you ONLY OUTPUT PYTHON CODE with no explanations. If the user includes a specific example, generate a visualization of that concept directly. If no example is given, create a relevant example that effectively represents the topic. Provide only the Python code as output, formatted to be saved and executed as a .py file.",
@@ -42,22 +50,24 @@ class VisualTools:
                     ("user", "{query}"),
                 ]
             )
-        elif "o1" in storm_config.code_model.lower() or "o3" in storm_config.code_model.lower():
-            self.llm = ChatOpenAI(
-                model=storm_config.code_model
+        elif (
+            "o1" in storm_config.code_model.lower()
+            or "o3" in storm_config.code_model.lower()
+        ):
+            self.llm = ChatOpenAI(model=storm_config.code_model)
+            self.code_writing_prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "user",
+                        "You are an expert in the Manim library, specializing in creating animations and visualizations in Python. Your task is to write Manim code based on user-provided topics or queries and you ONLY OUTPUT PYTHON CODE with no explanations. If the query includes a specific example, generate a visualization of that concept directly. If no example is given, create a relevant example that effectively represents the topic. Provide only the Python code as output, formatted to be saved and executed as a .py file.\n\n{query}",
+                    )
+                ]
             )
-            self.code_writing_prompt = ChatPromptTemplate.from_messages([
-                (
-                    "user",
-                    "You are an expert in the Manim library, specializing in creating animations and visualizations in Python. Your task is to write Manim code based on user-provided topics or queries and you ONLY OUTPUT PYTHON CODE with no explanations. If the query includes a specific example, generate a visualization of that concept directly. If no example is given, create a relevant example that effectively represents the topic. Provide only the Python code as output, formatted to be saved and executed as a .py file.\n\n{query}"
-                )
-            ])
         else:
             raise Exception(
                 f"Visualization Tools: Model {storm_config.code_model} is not available!"
             )
 
-        
         self.code_writer = self.code_writing_prompt | self.llm
 
     def visualize(
@@ -103,7 +113,12 @@ class VisualTools:
                         .replace("sandbox:", "")
                     )
             else:
-                code = self.code_writer.invoke({"query": query})
+                with get_openai_callback() as cb:
+                    code = self.code_writer.invoke({"query": query})
+                    print(f"Total Tokens: {cb.total_tokens}")
+                    print(f"Prompt Tokens: {cb.prompt_tokens}")
+                    print(f"Completion Tokens: {cb.completion_tokens}")
+                    print(f"Total Cost (USD): ${cb.total_cost}")
 
         raise Exception(
             f"Visualization Tool: Manim agent code execution error: {error}"
@@ -164,67 +179,3 @@ class VisualTools:
         finally:
             if os.path.exists(temp_filename):
                 os.remove(temp_filename)
-
-
-if __name__ == "__main__":
-
-    @tool
-    def visualize(
-        query: Annotated[str, "Detailed query for the visualization"],
-        name: Annotated[
-            str, "name of the output file, should be descriptive of the visualization"
-        ],
-        output_type=Annotated[
-            str,
-            'type of the output/media to generate, should be either "animation" or "image"',
-        ],
-    ) -> str:
-        """
-        Generates a visualization using the Manim library based on the provided query.
-
-        Args:
-            query (str): Specific description of the concept to visualize.
-            name (str): Name for the output file.
-            output_type (str): Type of output, "animation" or "image".
-
-        Returns:
-            str: Path to the generated visualization file.
-        """
-        vis_tools = VisualTools()
-        return vis_tools.visualize(query, name, output_type)
-
-    def should_continue(state: MessagesState):
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
-            return "tools"
-        return END
-
-    def call_model(state: MessagesState):
-        messages = state["messages"]
-        response = model_with_tools.invoke(messages)
-        return {"messages": [response]}
-
-    tools = [visualize]
-    tool_node = ToolNode(tools)
-
-    model_with_tools = ChatOpenAI(model="gpt-4o", temperature=0.7).bind_tools(tools)
-
-    workflow = StateGraph(MessagesState)
-
-    workflow.add_node("agent", call_model)
-    workflow.add_node("tools", tool_node)
-
-    workflow.add_edge(START, "agent")
-    workflow.add_conditional_edges("agent", should_continue, ["tools", END])
-    workflow.add_edge("tools", "agent")
-    app = workflow.compile()
-    
-    # Solve the following problem and create an animation of the solution:
-    prompt = """Create an animation to demonstrate how to do inventory valuation using the Lower of cost or market"""
-
-    for chunk in app.stream(
-        {"messages": [("human", prompt)]},
-        stream_mode="values",
-    ):
-        chunk["messages"][-1].pretty_print()
