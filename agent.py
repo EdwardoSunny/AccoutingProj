@@ -13,14 +13,13 @@ from langgraph.graph import StateGraph, MessagesState
 from langgraph.prebuilt import ToolNode
 from typing import Annotated
 
-
 class VisualTools:
     def __init__(self, storm_config: STORMConfig = STORMConfig()):
         # Initialize based on the specified model
         self.storm_config = storm_config
         if storm_config.code_model.split("-")[0].lower() == "gpt":
             self.llm = ChatOpenAI(
-                model=storm_config.code_model, temperature=storm_config.temperature
+                model=storm_config.code_model, temperature=storm_config.temperature, api_key=storm_config.openai_api_key
             )
             self.code_writing_prompt = ChatPromptTemplate.from_messages([
                     (
@@ -32,7 +31,7 @@ class VisualTools:
             )
         elif storm_config.code_model.split("-")[0].lower() == "claude":
             self.llm = ChatAnthropic(
-                model=storm_config.code_model, temperature=storm_config.temperature
+                model=storm_config.code_model, temperature=storm_config.temperature, api_key=storm_config.anthropic_api_key
             )
             # Prompt templates for generating and fixing Manim code
             self.code_writing_prompt = ChatPromptTemplate.from_messages([

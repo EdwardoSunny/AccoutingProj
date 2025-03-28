@@ -22,3 +22,7 @@ class STORMConfig:
 
     # output locations
     docs_path: str = f"{os.getcwd()}/generated_docs/"
+
+    # api keys
+    openai_api_key: str = "abc"
+    anthropic_api_key: str = "abc"

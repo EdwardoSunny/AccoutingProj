@@ -58,7 +58,12 @@ workflow.add_edge("tools", "agent")
 app = workflow.compile()
 
 # =============================================================================
-prompt = """Create an animation to demonstrate how to do inventory valuation using the Lower of cost or market"""
+prompt = """
+bajboijsg
+
+asoijfoifsjad
+
+"""
 # =============================================================================
 
 for chunk in app.stream(
