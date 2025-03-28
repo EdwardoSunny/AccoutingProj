@@ -14,10 +14,12 @@ def visualize(
     name: Annotated[
         str, "name of the output file, should be descriptive of the visualization"
     ],
-    output_type=Annotated[
+    output_type: Annotated[
         str,
         'type of the output/media to generate, should be either "animation" or "image"',
     ],
+    feedback: Annotated[str, "Feedback from the visualization judge, if avaliable. Can leave blank if it is not avaliable"] = "",
+    current_code: Annotated[str, "Current version of the code to work off of, if avliable. Can leave blank if it is not avaliable"] = ""
 ) -> str:
     """
     Generates a visualization using the Manim library based on the provided query.
@@ -26,13 +28,15 @@ def visualize(
         query (str): Specific description of the concept to visualize.
         name (str): Name for the output file.
         output_type (str): Type of output, "animation" or "image".
-
+        feedback (str): Feedback from the visualization judge, if available. Can leave blank if it is not available. 
+        current_code (str): Current version of the code that you want to improve to work off of, if available. Can leave blank if it is not available
     Returns:
         str: Path to the generated visualization file.
+        str: Current version of the code
     """
     vis_tools = VisualTools()
-    vis_file_path = vis_tools.visualize(query, name, output_type)
-    return vis_file_path
+    vis_file_path, code = vis_tools.visualize(query, name, output_type, feedback, current_code)
+    return code, vis_file_path
 
 @tool
 def judge_visualization(
@@ -83,22 +87,21 @@ PROCESS:
 
 3. After generating the visualization, ALWAYS use the `judge_visualization` tool with the returned file path to get feedback.
 4. Evaluate the judge's feedback:
-   - If the judge indicates "visualization is passable" or provides a mostly positive feedback, inform the user that the visualization is complete and successful and stop the task.
-   - If the judge indicates the visualization needs improvement, create an improved version by calling the `visualize` tool again with an enhanced query that addresses the specific critiques.
+   - If the judge indicates "visualization is passable" or provides a mostly positive feedback, inform the user that the visualization is complete and successful and stop the task. j
+   - If the judge indicates the visualization needs improvement, create an improved version by calling the `visualize` tool again keeping the same query, but then passing the feedback into the feedback field to improve it. Pass in the current version of the code for it to be improved as well.
    - Continue this improvement loop until the judge deems the visualization passable.
 
 IMPORTANT GUIDELINES:
 - NEVER conclude the task until the judge explicitly indicates the visualization is passable
-- Be precise and detailed in your visualization queries
 - For mathematical concepts, ensure accurate representation of principles and relationships
 - For animations, consider timing, transitions, and clarity of motion
-- Always prioritize educational clarity over aesthetic complexity
+- Always prioritize visualization clarity, ensuring nothing overlaps and it is readable 
 - When improving based on feedback, make substantial changes that address the core issues
 
 Think step by step and be methodical in your approach to creating effective visualizations.
 """
 
-model_with_tools = ChatOpenAI(model="gpt-4o", temperature=0.7).bind_tools(tools)
+model_with_tools = ChatOpenAI(model="o3-mini", max_tokens=20000).bind_tools(tools)
 
 workflow = StateGraph(MessagesState)
 
@@ -112,7 +115,7 @@ app = workflow.compile()
 
 # =============================================================================
 prompt = """
-Animate the pythagorean theorem with a right triangle and squares on each side. Make sure there are no overlapping shapes and the animation is clear and easy to understand.
+Visualize the concept of the differention using limits
 """
 # =============================================================================
 

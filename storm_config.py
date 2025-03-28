@@ -17,7 +17,6 @@ class STORMConfig:
 
     # visualization tool configs
     media_path: str = f"{os.getcwd()}/generated_visuals/"
-    max_retry: int = 10
     temperature: float = 1.0
     quality: str = "-qh"  # manim docs
 
